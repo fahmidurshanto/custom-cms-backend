@@ -28,6 +28,7 @@ const client = new MongoClient(uri, {
 
 // collections
 const admissionCollection = client.db("fahmidurDB").collection("admission");
+const locationCollection = client.db("fahmidurDB").collection("locations");
 async function run() {
   try {
     await client.connect();
@@ -50,6 +51,20 @@ async function run() {
     })
 
     // -------------------------------------------
+    
+    // -----Location ROutes---------
+    app.post("/locations", async (req, res)=>{
+      const locationInfo  = req.body;
+      const newLocation = await locationCollection.insertOne(locationInfo);
+      res.send(newLocation)
+    })
+
+    app.get("/locations", async (req, res) =>{
+      console.log(locationCollection)
+      const locations = await locationCollection.find().toArray();
+      res.send(locations)
+    })
+    
 
     app.listen(port, () => {
         console.log(`Server is running on port ${port}`);

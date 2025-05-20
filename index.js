@@ -3,7 +3,7 @@ const app = express();
 const cors = require('cors');
 const port = process.env.PORT || 3000;
 require("dotenv").config();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 // middlewares
 app.use(cors());
@@ -64,6 +64,42 @@ app.get("/locations", async (req, res) => {
   try {
     const locations = await locationCollection.find().toArray();
     res.send(locations);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+// -----Location Routes---------
+// Add these routes below your existing location routes
+
+app.put("/locations/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const filter = { _id: new ObjectId(id) };
+    const options = { upsert: true };
+    const updatedLocation = req.body;
+    
+    const updateDoc = {
+      $set: {
+        location: updatedLocation.location,
+        address1: updatedLocation.address1,
+        address2: updatedLocation.address2,
+        published: updatedLocation.published
+      }
+    };
+
+    const result = await locationCollection.updateOne(filter, updateDoc, options);
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.delete("/locations/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const filter = { _id: new ObjectId(id) };
+    const result = await locationCollection.deleteOne(filter);
+    res.send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });
   }

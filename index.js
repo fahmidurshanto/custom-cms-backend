@@ -30,6 +30,8 @@ const client = new MongoClient(uri, {
 const admissionCollection = client.db("customAppDB").collection("admission");
 const locationCollection = client.db("customAppDB").collection("locations");
 const vendorCollection = client.db("customAppDB").collection("vendors");
+const coursesCollection = client.db("customAppDB").collection("courses");
+
 
 // Root route
 app.get("/", (req, res) => {
@@ -208,6 +210,66 @@ app.delete("/vendors/:id", async (req, res) => {
     const id = req.params.id;
     const filter = { _id: new ObjectId(id) };
     const result = await vendorCollection.deleteOne(filter);
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+// ------------ Course Routes ------------
+app.post("/courses", async (req, res) => {
+  try {
+    const courseData = {
+      title: req.body.title,
+      code: req.body.code,
+      published: req.body.published,
+      assignmentDuration: parseInt(req.body.assignmentDuration),
+      createdAt: new Date()
+    };
+    
+    const result = await coursesCollection.insertOne(courseData);
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.get("/courses", async (req, res) => {
+  try {
+    const courses = await coursesCollection.find().sort({ createdAt: -1 }).toArray();
+    res.send(courses);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.put("/courses/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const filter = { _id: new ObjectId(id) };
+    
+    const updateDoc = {
+      $set: {
+        title: req.body.title,
+        code: req.body.code,
+        published: req.body.published,
+        assignmentDuration: parseInt(req.body.assignmentDuration),
+        updatedAt: new Date()
+      }
+    };
+
+    const result = await coursesCollection.updateOne(filter, updateDoc);
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.delete("/courses/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const filter = { _id: new ObjectId(id) };
+    const result = await coursesCollection.deleteOne(filter);
     res.send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });

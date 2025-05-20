@@ -62,11 +62,9 @@ async function run() {
     })
     
 
-    // if (!process.env.VERCEL) {
-    //   app.listen(port, () => {
-    //     console.log(`Server is running on port ${port}`);
-    //   });
-    // }
+    app.listen(port, () => {
+        console.log(`Server is running on port ${port}`);
+    })
 
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");

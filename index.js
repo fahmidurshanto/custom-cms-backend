@@ -3,11 +3,17 @@ const app = express();
 const cors = require('cors');
 const port = process.env.PORT || 3000;
 require("dotenv").config();
+const multer = require('multer');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+
+
+
 
 // middlewares
 app.use(cors());
 app.use(express.json());
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
 
 const uri = `${process.env.MONGO_URI}`;
 
@@ -23,6 +29,7 @@ const client = new MongoClient(uri, {
 // collections
 const admissionCollection = client.db("customAppDB").collection("admission");
 const locationCollection = client.db("customAppDB").collection("locations");
+const vendorCollection = client.db("customAppDB").collection("vendors");
 
 // Root route
 app.get("/", (req, res) => {
@@ -99,6 +106,108 @@ app.delete("/locations/:id", async (req, res) => {
     const id = req.params.id;
     const filter = { _id: new ObjectId(id) };
     const result = await locationCollection.deleteOne(filter);
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+
+
+// ------------ Vendor Routes ------------
+app.post("/vendors", upload.single('logo'), async (req, res) => {
+  try {
+    const approvedBy = req.body.approvedBy ? 
+      (Array.isArray(req.body.approvedBy) ? req.body.approvedBy : [req.body.approvedBy]) 
+      : [];
+
+    const newVendor = {
+      name: req.body.name,
+      fax: req.body.fax,
+      published: req.body.published,
+      approvedBy: approvedBy,
+      accountInfo: req.body.accountInfo,
+      webAddress: req.body.webAddress,
+      address1: req.body.address1,
+      address2: req.body.address2,
+      regInfo: req.body.regInfo,
+      phone: req.body.phone,
+      email: req.body.email,
+      invoicePrefix: req.body.invoicePrefix,
+    };
+
+    if (req.file) {
+      newVendor.logo = {
+        data: req.file.buffer.toString('base64'),
+        contentType: req.file.mimetype
+      };
+    }
+
+    const result = await vendorCollection.insertOne(newVendor);
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.get("/vendors", async (req, res) => {
+  try {
+    const vendors = await vendorCollection.find().toArray();
+    const vendorsWithLogo = vendors.map(vendor => ({
+      ...vendor,
+      logo: vendor.logo ? `data:${vendor.logo.contentType};base64,${vendor.logo.data}` : null
+    }));
+    res.send(vendorsWithLogo);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.put("/vendors/:id", upload.single('logo'), async (req, res) => {
+  try {
+    const id = req.params.id;
+    const filter = { _id: new ObjectId(id) };
+    
+    const approvedBy = req.body.approvedBy ? 
+      (Array.isArray(req.body.approvedBy) ? req.body.approvedBy : [req.body.approvedBy]) 
+      : [];
+
+    const updateDoc = {
+      $set: {
+        name: req.body.name,
+        fax: req.body.fax,
+        published: req.body.published,
+        approvedBy: approvedBy,
+        accountInfo: req.body.accountInfo,
+        webAddress: req.body.webAddress,
+        address1: req.body.address1,
+        address2: req.body.address2,
+        regInfo: req.body.regInfo,
+        phone: req.body.phone,
+        email: req.body.email,
+        invoicePrefix: req.body.invoicePrefix
+      }
+    };
+
+    if (req.file) {
+      updateDoc.$set.logo = {
+        data: req.file.buffer.toString('base64'),
+        contentType: req.file.mimetype
+      };
+    }
+
+    const result = await vendorCollection.updateOne(filter, updateDoc);
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.delete("/vendors/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const filter = { _id: new ObjectId(id) };
+    const result = await vendorCollection.deleteOne(filter);
     res.send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });

@@ -62,9 +62,11 @@ async function run() {
     })
     
 
-    app.listen(port, () => {
+    if (!process.env.VERCEL) {
+      app.listen(port, () => {
         console.log(`Server is running on port ${port}`);
-    })
+      });
+    }
 
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
@@ -74,3 +76,8 @@ async function run() {
   }
 }
 run().catch(console.dir);
+
+
+// Export the Express API for Vercel
+module.exports = app;
+

@@ -31,6 +31,7 @@ const admissionCollection = client.db("customAppDB").collection("admission");
 const locationCollection = client.db("customAppDB").collection("locations");
 const vendorCollection = client.db("customAppDB").collection("vendors");
 const coursesCollection = client.db("customAppDB").collection("courses");
+const batchesCollection = client.db("customAppDB").collection("batches");
 
 
 // Root route
@@ -270,6 +271,69 @@ app.delete("/courses/:id", async (req, res) => {
     const id = req.params.id;
     const filter = { _id: new ObjectId(id) };
     const result = await coursesCollection.deleteOne(filter);
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+// ------------ Batch Routes ------------
+app.post("/batches", async (req, res) => {
+  try {
+    const batchData = {
+      batchNo: req.body.batchNo,
+      course: req.body.course,
+      startDate: new Date(req.body.startDate),
+      endDate: new Date(req.body.endDate),
+      published: req.body.published,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    const result = await batchesCollection.insertOne(batchData);
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.get("/batches", async (req, res) => {
+  try {
+    const batches = await batchesCollection.find().sort({ createdAt: -1 }).toArray();
+    res.send(batches);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.put("/batches/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const filter = { _id: new ObjectId(id) };
+    
+    const updateDoc = {
+      $set: {
+        batchNo: req.body.batchNo,
+        course: req.body.course,
+        startDate: new Date(req.body.startDate),
+        endDate: new Date(req.body.endDate),
+        published: req.body.published,
+        updatedAt: new Date()
+      }
+    };
+
+    const result = await batchesCollection.updateOne(filter, updateDoc);
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.delete("/batches/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const filter = { _id: new ObjectId(id) };
+    const result = await batchesCollection.deleteOne(filter);
     res.send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });

@@ -27,11 +27,13 @@ const client = new MongoClient(uri, {
 });
 
 // collections
-const admissionCollection = client.db("customAppDB").collection("admission");
+const studentsCollection = client.db("customAppDB").collection("students");
 const locationCollection = client.db("customAppDB").collection("locations");
 const vendorCollection = client.db("customAppDB").collection("vendors");
 const coursesCollection = client.db("customAppDB").collection("courses");
 const batchesCollection = client.db("customAppDB").collection("batches");
+const certificationsCollection = client.db("customAppDB").collection("certifications");
+
 
 
 // Root route
@@ -40,20 +42,20 @@ app.get("/", (req, res) => {
 });
 
 // ------------all admission routes-----------
-app.post("/admission", async (req, res) => {
+app.post("/students", async (req, res) => {
   try {
     const newStudentInfo = req.body;
-    const result = await admissionCollection.insertOne(newStudentInfo);
+    const result = await studentsCollection.insertOne(newStudentInfo);
     res.send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });
   }
 });
 
-app.get("/admission", async (req, res) => {
+app.get("/students", async (req, res) => {
   try {
-    const admissions = await admissionCollection.find().toArray();
-    res.send(admissions);
+    const students = await studentsCollection.find().toArray();
+    res.send(students);
   } catch (error) {
     res.status(500).send({ error: error.message });
   }
@@ -334,6 +336,68 @@ app.delete("/batches/:id", async (req, res) => {
     const id = req.params.id;
     const filter = { _id: new ObjectId(id) };
     const result = await batchesCollection.deleteOne(filter);
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+// ------------ Certification Routes ------------
+app.post("/certifications", async (req, res) => {
+  try {
+    const certificationData = {
+      certificateId: req.body.certificateId,
+      recipient: req.body.recipient,
+      course: req.body.course,
+      issueDate: new Date(req.body.issueDate),
+      status: req.body.status,
+      createdAt: new Date()
+    };
+    
+    const result = await certificationsCollection.insertOne(certificationData);
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.get("/certifications", async (req, res) => {
+  try {
+    const certifications = await certificationsCollection.find().sort({ createdAt: -1 }).toArray();
+    res.send(certifications);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.put("/certifications/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const filter = { _id: new ObjectId(id) };
+    
+    const updateDoc = {
+      $set: {
+        certificateId: req.body.certificateId,
+        recipient: req.body.recipient,
+        course: req.body.course,
+        issueDate: new Date(req.body.issueDate),
+        status: req.body.status,
+        updatedAt: new Date()
+      }
+    };
+
+    const result = await certificationsCollection.updateOne(filter, updateDoc);
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.delete("/certifications/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const filter = { _id: new ObjectId(id) };
+    const result = await certificationsCollection.deleteOne(filter);
     res.send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });

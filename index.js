@@ -6,13 +6,10 @@ require("dotenv").config();
 const multer = require('multer');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
-
-
-
 // middlewares
 app.use(cors());
 app.use(express.json());
-const storage = multer.memoryStorage();
+const storage = multer.memoryStorage(); // Use memoryStorage for file uploads
 const upload = multer({ storage: storage });
 
 const uri = `${process.env.MONGO_URI}`;
@@ -33,8 +30,7 @@ const vendorCollection = client.db("customAppDB").collection("vendors");
 const coursesCollection = client.db("customAppDB").collection("courses");
 const batchesCollection = client.db("customAppDB").collection("batches");
 const certificationsCollection = client.db("customAppDB").collection("certifications");
-
-
+const employeesCollection = client.db("customAppDB").collection("employees");
 
 // Root route
 app.get("/", (req, res) => {
@@ -80,8 +76,6 @@ app.get("/locations", async (req, res) => {
     res.status(500).send({ error: error.message });
   }
 });
-// -----Location Routes---------
-// Add these routes below your existing location routes
 
 app.put("/locations/:id", async (req, res) => {
   try {
@@ -117,8 +111,6 @@ app.delete("/locations/:id", async (req, res) => {
   }
 });
 
-
-
 // ------------ Vendor Routes ------------
 app.post("/vendors", upload.single('logo'), async (req, res) => {
   try {
@@ -139,6 +131,7 @@ app.post("/vendors", upload.single('logo'), async (req, res) => {
       phone: req.body.phone,
       email: req.body.email,
       invoicePrefix: req.body.invoicePrefix,
+      createdAt: new Date(),
     };
 
     if (req.file) {
@@ -149,7 +142,7 @@ app.post("/vendors", upload.single('logo'), async (req, res) => {
     }
 
     const result = await vendorCollection.insertOne(newVendor);
-    res.send(result);
+    res.status(201).send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });
   }
@@ -157,7 +150,7 @@ app.post("/vendors", upload.single('logo'), async (req, res) => {
 
 app.get("/vendors", async (req, res) => {
   try {
-    const vendors = await vendorCollection.find().toArray();
+    const vendors = await vendorCollection.find().sort({ createdAt: -1 }).toArray();
     const vendorsWithLogo = vendors.map(vendor => ({
       ...vendor,
       logo: vendor.logo ? `data:${vendor.logo.contentType};base64,${vendor.logo.data}` : null
@@ -171,6 +164,9 @@ app.get("/vendors", async (req, res) => {
 app.put("/vendors/:id", upload.single('logo'), async (req, res) => {
   try {
     const id = req.params.id;
+    if (!ObjectId.isValid(id)) {
+        return res.status(400).send({ message: "Invalid Vendor ID format" });
+    }
     const filter = { _id: new ObjectId(id) };
     
     const approvedBy = req.body.approvedBy ? 
@@ -190,7 +186,8 @@ app.put("/vendors/:id", upload.single('logo'), async (req, res) => {
         regInfo: req.body.regInfo,
         phone: req.body.phone,
         email: req.body.email,
-        invoicePrefix: req.body.invoicePrefix
+        invoicePrefix: req.body.invoicePrefix,
+        updatedAt: new Date()
       }
     };
 
@@ -199,9 +196,15 @@ app.put("/vendors/:id", upload.single('logo'), async (req, res) => {
         data: req.file.buffer.toString('base64'),
         contentType: req.file.mimetype
       };
+    } else if (req.body.logo === 'null') { // Check if client wants to remove logo
+        updateDoc.$unset = { logo: "" }; // Or updateDoc.$set.logo = null;
     }
 
+
     const result = await vendorCollection.updateOne(filter, updateDoc);
+    if (result.matchedCount === 0) {
+        return res.status(404).send({ message: "Vendor not found" });
+    }
     res.send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });
@@ -211,13 +214,187 @@ app.put("/vendors/:id", upload.single('logo'), async (req, res) => {
 app.delete("/vendors/:id", async (req, res) => {
   try {
     const id = req.params.id;
+    if (!ObjectId.isValid(id)) {
+        return res.status(400).send({ message: "Invalid Vendor ID format" });
+    }
     const filter = { _id: new ObjectId(id) };
     const result = await vendorCollection.deleteOne(filter);
+    if (result.deletedCount === 0) {
+        return res.status(404).send({ message: "Vendor not found" });
+    }
     res.send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });
   }
 });
+
+
+// ------------ Employee Routes ------------
+// Middleware for handling 'photo' and 'signature' file uploads
+const employeeUploads = upload.fields([
+    { name: 'photo', maxCount: 1 },
+    { name: 'signature', maxCount: 1 }
+]);
+
+app.post("/employees", employeeUploads, async (req, res) => {
+  try {
+    const employeeData = req.body;
+    const newEmployee = {
+        fullName: employeeData.fullName,
+        surname: employeeData.surname, // Assuming surname is sent; add if not
+        email: employeeData.email,
+        mNumber: employeeData.mNumber, // Mobile Number
+        contact: employeeData.contact, // Contact Number
+        address1: employeeData.address1,
+        address2: employeeData.address2,
+        position: employeeData.position,
+        status: employeeData.status,
+        dob: employeeData.dob ? new Date(employeeData.dob) : null, // Date of Birth
+        licenseNo: employeeData.licenseNo,
+        joiningDate: employeeData.joiningDate ? new Date(employeeData.joiningDate) : null,
+        leavingDate: employeeData.leavingDate ? new Date(employeeData.leavingDate) : null,
+        gender: employeeData.gender,
+        vendor: employeeData.vendor, // This should be the vendor's _id
+        note: employeeData.note,
+        createdAt: new Date(),
+    };
+
+    if (req.files && req.files.photo && req.files.photo[0]) {
+      newEmployee.photo = {
+        data: req.files.photo[0].buffer.toString('base64'),
+        contentType: req.files.photo[0].mimetype
+      };
+    }
+    if (req.files && req.files.signature && req.files.signature[0]) {
+      newEmployee.signature = {
+        data: req.files.signature[0].buffer.toString('base64'),
+        contentType: req.files.signature[0].mimetype
+      };
+    }
+
+    const result = await employeesCollection.insertOne(newEmployee);
+    // Return the inserted document with its _id
+    const insertedEmployee = await employeesCollection.findOne({_id: result.insertedId});
+     const formattedEmployee = {
+        ...insertedEmployee,
+        id: insertedEmployee._id, // React component might expect 'id'
+        photo: insertedEmployee.photo ? `data:${insertedEmployee.photo.contentType};base64,${insertedEmployee.photo.data}` : null,
+        signature: insertedEmployee.signature ? `data:${insertedEmployee.signature.contentType};base64,${insertedEmployee.signature.data}` : null,
+    };
+    delete formattedEmployee._id; // Remove _id if 'id' is preferred by frontend
+
+    res.status(201).send(formattedEmployee);
+  } catch (error) {
+    console.error("Error creating employee:", error);
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.get("/employees", async (req, res) => {
+  try {
+    const employees = await employeesCollection.find().sort({ createdAt: -1 }).toArray();
+    const employeesWithFormattedData = employees.map(emp => ({
+      ...emp,
+      id: emp._id, // Add 'id' field for frontend compatibility
+      photo: emp.photo ? `data:${emp.photo.contentType};base64,${emp.photo.data}` : null,
+      signature: emp.signature ? `data:${emp.signature.contentType};base64,${emp.signature.data}` : null,
+    }));
+    res.send(employeesWithFormattedData);
+  } catch (error) {
+    console.error("Error fetching employees:", error);
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.put("/employees/:id", employeeUploads, async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!ObjectId.isValid(id)) {
+        return res.status(400).send({ message: "Invalid Employee ID format" });
+    }
+    const filter = { _id: new ObjectId(id) };
+    const employeeData = req.body;
+
+    const updateDoc = {
+      $set: {
+        fullName: employeeData.fullName,
+        surname: employeeData.surname,
+        email: employeeData.email,
+        mNumber: employeeData.mNumber,
+        contact: employeeData.contact,
+        address1: employeeData.address1,
+        address2: employeeData.address2,
+        position: employeeData.position,
+        status: employeeData.status,
+        dob: employeeData.dob ? new Date(employeeData.dob) : null,
+        licenseNo: employeeData.licenseNo,
+        joiningDate: employeeData.joiningDate ? new Date(employeeData.joiningDate) : null,
+        leavingDate: employeeData.leavingDate ? new Date(employeeData.leavingDate) : null,
+        gender: employeeData.gender,
+        vendor: employeeData.vendor,
+        note: employeeData.note,
+        updatedAt: new Date()
+      }
+    };
+
+    if (req.files && req.files.photo && req.files.photo[0]) {
+      updateDoc.$set.photo = {
+        data: req.files.photo[0].buffer.toString('base64'),
+        contentType: req.files.photo[0].mimetype
+      };
+    } else if (employeeData.photo === 'null') { // Client explicitly wants to remove photo
+        updateDoc.$unset = { ...updateDoc.$unset, photo: "" };
+    }
+
+
+    if (req.files && req.files.signature && req.files.signature[0]) {
+      updateDoc.$set.signature = {
+        data: req.files.signature[0].buffer.toString('base64'),
+        contentType: req.files.signature[0].mimetype
+      };
+    } else if (employeeData.signature === 'null') { // Client explicitly wants to remove signature
+        updateDoc.$unset = { ...updateDoc.$unset, signature: "" };
+    }
+
+
+    const result = await employeesCollection.updateOne(filter, updateDoc);
+    if (result.matchedCount === 0) {
+        return res.status(404).send({ message: "Employee not found" });
+    }
+     // Fetch and return the updated document
+    const updatedEmployee = await employeesCollection.findOne(filter);
+    const formattedEmployee = {
+        ...updatedEmployee,
+        id: updatedEmployee._id,
+        photo: updatedEmployee.photo ? `data:${updatedEmployee.photo.contentType};base64,${updatedEmployee.photo.data}` : null,
+        signature: updatedEmployee.signature ? `data:${updatedEmployee.signature.contentType};base64,${updatedEmployee.signature.data}` : null,
+    };
+    delete formattedEmployee._id;
+    res.send(formattedEmployee);
+  } catch (error) {
+    console.error("Error updating employee:", error);
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.delete("/employees/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+     if (!ObjectId.isValid(id)) {
+        return res.status(400).send({ message: "Invalid Employee ID format" });
+    }
+    const filter = { _id: new ObjectId(id) };
+    const result = await employeesCollection.deleteOne(filter);
+     if (result.deletedCount === 0) {
+        return res.status(404).send({ message: "Employee not found" });
+    }
+    res.send({ message: "Employee deleted successfully", deletedCount: result.deletedCount, _id: id });
+  } catch (error) {
+    console.error("Error deleting employee:", error);
+    res.status(500).send({ error: error.message });
+  }
+});
+
 
 // ------------ Course Routes ------------
 app.post("/courses", async (req, res) => {
@@ -284,12 +461,11 @@ app.post("/batches", async (req, res) => {
   try {
     const batchData = {
       batchNo: req.body.batchNo,
-      course: req.body.course,
+      course: req.body.course, // Should be courseId
       startDate: new Date(req.body.startDate),
       endDate: new Date(req.body.endDate),
       published: req.body.published,
       createdAt: new Date(),
-      updatedAt: new Date()
     };
     
     const result = await batchesCollection.insertOne(batchData);
@@ -346,12 +522,11 @@ app.delete("/batches/:id", async (req, res) => {
 app.post("/certifications", async (req, res) => {
   try {
     const certificationData = {
-      semiDate: req.body.semiDate,
+      semiDate: req.body.semiDate, // Assuming this is a string or needs parsing
       name: req.body.name,
       doorNumber: req.body.doorNumber,
       courseName: req.body.courseName,
       createdAt: new Date(),
-      updatedAt: new Date()
     };
     
     const result = await certificationsCollection.insertOne(certificationData);
@@ -363,7 +538,7 @@ app.post("/certifications", async (req, res) => {
 
 app.get("/certifications", async (req, res) => {
   try {
-    const certifications = await certificationsCollection.find().toArray();
+    const certifications = await certificationsCollection.find().sort({ createdAt: -1 }).toArray();
     res.send(certifications);
   } catch (error) {
     res.status(500).send({ error: error.message });
@@ -403,26 +578,28 @@ app.delete("/certifications/:id", async (req, res) => {
   }
 });
 
-
-
 // Connect to MongoDB and start server
 async function run() {
   try {
     await client.connect();
     console.log("Successfully connected to MongoDB!");
     
-    if (process.env.NODE_ENV !== 'production') {
-      app.listen(port, () => {
-        console.log(`Server is running on port ${port}`);
-      });
-    }
+    // Start listening only after successful DB connection
+    app.listen(port, () => {
+      console.log(`Server is running on port ${port}`);
+    });
+
   } catch (error) {
-    console.error("Failed to connect to MongoDB:", error);
+    console.error("Failed to connect to MongoDB or start server:", error);
+    process.exit(1); // Exit if DB connection fails
   }
 }
 
-run().catch(console.dir);
+// Only run the server if not in a test environment or if this file is run directly
+if (process.env.NODE_ENV !== 'test') { // Added a check for test environment
+    run().catch(console.dir);
+}
+
 
 // Export the Express API for Vercel
 module.exports = app;
-

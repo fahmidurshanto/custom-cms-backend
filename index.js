@@ -346,12 +346,12 @@ app.delete("/batches/:id", async (req, res) => {
 app.post("/certifications", async (req, res) => {
   try {
     const certificationData = {
-      certificateId: req.body.certificateId,
-      recipient: req.body.recipient,
-      course: req.body.course,
-      issueDate: new Date(req.body.issueDate),
-      status: req.body.status,
-      createdAt: new Date()
+      semiDate: req.body.semiDate,
+      name: req.body.name,
+      doorNumber: req.body.doorNumber,
+      courseName: req.body.courseName,
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
     
     const result = await certificationsCollection.insertOne(certificationData);
@@ -363,7 +363,7 @@ app.post("/certifications", async (req, res) => {
 
 app.get("/certifications", async (req, res) => {
   try {
-    const certifications = await certificationsCollection.find().sort({ createdAt: -1 }).toArray();
+    const certifications = await certificationsCollection.find().toArray();
     res.send(certifications);
   } catch (error) {
     res.status(500).send({ error: error.message });
@@ -377,11 +377,10 @@ app.put("/certifications/:id", async (req, res) => {
     
     const updateDoc = {
       $set: {
-        certificateId: req.body.certificateId,
-        recipient: req.body.recipient,
-        course: req.body.course,
-        issueDate: new Date(req.body.issueDate),
-        status: req.body.status,
+        semiDate: req.body.semiDate,
+        name: req.body.name,
+        doorNumber: req.body.doorNumber,
+        courseName: req.body.courseName,
         updatedAt: new Date()
       }
     };
@@ -403,6 +402,8 @@ app.delete("/certifications/:id", async (req, res) => {
     res.status(500).send({ error: error.message });
   }
 });
+
+
 
 // Connect to MongoDB and start server
 async function run() {

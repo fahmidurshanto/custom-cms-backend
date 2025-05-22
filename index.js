@@ -31,6 +31,7 @@ const coursesCollection = client.db("customAppDB").collection("courses");
 const batchesCollection = client.db("customAppDB").collection("batches");
 const certificationsCollection = client.db("customAppDB").collection("certifications");
 const employeesCollection = client.db("customAppDB").collection("employees");
+const emailsCollection = client.db("customAppDB").collection("emails");
 
 // Root route
 app.get("/", (req, res) => {
@@ -573,6 +574,130 @@ app.delete("/certifications/:id", async (req, res) => {
     const filter = { _id: new ObjectId(id) };
     const result = await certificationsCollection.deleteOne(filter);
     res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+
+
+// ------------ E-Marketing Routes ------------
+app.post("/e-marketing", upload.single('attachment'), async (req, res) => {
+  try {
+    const { sendOption, sendTime, ...emailData } = req.body;
+    const newEmail = {
+      to: emailData.to,
+      fromMail: emailData.fromMail,
+      subject: emailData.subject,
+      body: emailData.body,
+      proverb: emailData.proverb,
+      status: "Pending", // Default status
+      sendTime: sendOption === 'now' ? new Date() : new Date(sendTime),
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    if (req.file) {
+      newEmail.attachment = {
+        data: req.file.buffer.toString('base64'),
+        contentType: req.file.mimetype,
+        size: req.file.size
+      };
+    }
+
+    const result = await emailsCollection.insertOne(newEmail);
+    res.status(201).send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.get("/e-marketing", async (req, res) => {
+  try {
+    const emails = await emailsCollection.find().sort({ createdAt: -1 }).toArray();
+    const formattedEmails = emails.map(email => ({
+      ...email,
+      id: email._id,
+      attachment: email.attachment ? {
+        ...email.attachment,
+        url: `data:${email.attachment.contentType};base64,${email.attachment.data}`
+      } : null
+    }));
+    res.send(formattedEmails);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.put("/e-marketing/:id", upload.single('attachment'), async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).send({ message: "Invalid Email ID format" });
+    }
+    
+    const filter = { _id: new ObjectId(id) };
+    const { sendOption, sendTime, ...updateData } = req.body;
+    
+    const updateDoc = {
+      $set: {
+        ...updateData,
+        sendTime: sendOption === 'now' ? new Date() : new Date(sendTime),
+        updatedAt: new Date()
+      }
+    };
+
+    if (req.file) {
+      updateDoc.$set.attachment = {
+        data: req.file.buffer.toString('base64'),
+        contentType: req.file.mimetype,
+        size: req.file.size
+      };
+    } else if (req.body.removeAttachment === 'true') {
+      updateDoc.$unset = { attachment: "" };
+    }
+
+    const result = await emailsCollection.updateOne(filter, updateDoc);
+    
+    if (result.matchedCount === 0) {
+      return res.status(404).send({ message: "Email not found" });
+    }
+    
+    const updatedEmail = await emailsCollection.findOne(filter);
+    const formattedEmail = {
+      ...updatedEmail,
+      id: updatedEmail._id,
+      attachment: updatedEmail.attachment ? {
+        ...updatedEmail.attachment,
+        url: `data:${updatedEmail.attachment.contentType};base64,${updatedEmail.attachment.data}`
+      } : null
+    };
+    
+    res.send(formattedEmail);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.delete("/e-marketing/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).send({ message: "Invalid Email ID format" });
+    }
+    
+    const filter = { _id: new ObjectId(id) };
+    const result = await emailsCollection.deleteOne(filter);
+    
+    if (result.deletedCount === 0) {
+      return res.status(404).send({ message: "Email not found" });
+    }
+    
+    res.send({ 
+      message: "Email deleted successfully",
+      deletedCount: result.deletedCount,
+      id: id
+    });
   } catch (error) {
     res.status(500).send({ error: error.message });
   }
